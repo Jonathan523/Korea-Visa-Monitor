@@ -20,6 +20,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 TZ = timezone(timedelta(hours=8))  # UTC+8
 
+# 默认使用简洁错误日志；排查问题时可开启完整调用栈。
+DEBUG = os.environ.get("VISA_DEBUG", "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
 
 def _parse_window(name, default_str):
     """从环境变量读取 HH:MM 格式的时间；无效时回退到默认值。"""
@@ -416,5 +424,17 @@ def main():
         print(f"{now:%H:%M} 状态无变化，不通知")
 
 
+def _run_main():
+    """运行监控；默认将未处理异常压缩为一行日志。"""
+    try:
+        main()
+    except Exception as exc:
+        if DEBUG:
+            raise
+        print(f"运行失败：{exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(_run_main())
