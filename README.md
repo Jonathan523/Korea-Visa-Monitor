@@ -2,14 +2,31 @@
 
 本项目用于按照给定的时间间隔自动查询并监控韩国签证申请状态。在首次运行或检测到状态变化时，程序会通过配置的推送渠道发送通知；查询时间窗口、申请人信息和推送方式均可通过环境变量配置。
 
+## 部署到 Modal
+
+首次使用时，先复制 `.env.example` 为 `.env` 并填写申请信息和推送密钥，然后执行一次 `uvx modal setup` 登录 Modal。之后部署或更新都只需一行：
+
+```powershell
+# pipx
+pipx run modal deploy modal_app.py
+# uv
+uvx modal deploy modal_app.py
+```
+
+部署后，任务会按 UTC+8 每天 `08:00`–`20:00` 每 10 分钟查询一次。`.env` 会作为 Modal Secret 加密注入，默认将查询状态保存在自动创建的 `krvisa-state` Volume 中；本机关闭后任务仍会继续运行。可用 `uvx modal run modal_app.py` 立即手动执行一次检查。
+
+`.env.example` 保留了全部存储和推送选项：Modal Volume 与 PushDeer 默认启用，S3、Upstash Redis 和 Server酱默认以注释形式保留。选择其他方案时，先注释当前默认配置，再取消目标方案的注释。
+
 ## 状态存储配置
 
-### 本地文件（默认，需要持久化存储）
+### Modal Volume（默认）
 
 | 环境变量 | 是否必填 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `VISA_STATE_STORAGE` | 否 | `local` | 状态存储方式。可选值：`local`、`s3`、`upstash`；本地文件使用 `local`。 |
-| `VISA_STATE_FILE` | 否 | 程序目录下的 `visa_state.json` | 状态文件路径；容器部署时可设为 `/<持久化路径>/visa_state.json`。 |
+| `VISA_STATE_STORAGE` | 否 | `local` | Modal Volume 通过本地文件接口读写，因此使用 `local`。 |
+| `VISA_STATE_FILE` | 否 | `/state/visa_state.json` | `/state` 挂载到自动创建的 `krvisa-state` Volume，容器重启后状态仍会保留。 |
+
+这是 Modal 部署的默认方案，不需要注册或配置其他存储服务。
 
 ### S3
 
@@ -24,7 +41,7 @@
 | `AWS_SECRET_ACCESS_KEY` | 视情况 | 无 | 与 `AWS_ACCESS_KEY_ID` 配套使用。 |
 | `AWS_SESSION_TOKEN` | 否 | 无 | 使用临时凭据时设置。 |
 
-凭据由 AWS SDK 的标准凭据链读取，因此部署在 AWS 上时也可以不传静态密钥，改用 IAM Role。所用身份至少需要目标对象的 `s3:GetObject` 和 `s3:PutObject` 权限。
+使用 S3 时，注释 `.env` 中默认的 `VISA_STATE_STORAGE=local` 和 `VISA_STATE_FILE`，再取消 S3 配置组的注释。凭据由 AWS SDK 的标准凭据链读取；所用身份至少需要目标对象的 `s3:GetObject` 和 `s3:PutObject` 权限。
 
 ### Upstash Redis（推荐用于无状态容器）
 
@@ -35,7 +52,7 @@
 | `UPSTASH_REDIS_REST_TOKEN` | 是 | 无 | Upstash REST API Token，应保存到部署平台的 Secret 中。 |
 | `VISA_UPSTASH_KEY` | 否 | `krvisa:visa_state` | 状态记录的 key；多个监控任务应使用不同的 key。 |
 
-此方式直接复用程序已有的 HTTP 客户端，不需要安装额外依赖。Token 不要写入镜像或提交到代码仓库。
+使用 Upstash 时，注释 `.env` 中默认的 Modal Volume 配置，再取消 Upstash 配置组的注释。此方式直接复用程序已有的 HTTP 客户端，不需要安装额外依赖。Token 不要写入镜像或提交到代码仓库。
 
 ## 推送设置
 
@@ -55,6 +72,8 @@
 | --- | --- | --- | --- |
 | `VISA_PUSH_CHANNEL` | 是 | `serverchan` | 推送渠道。可选值：`pushdeer`、`serverchan`；使用 Server酱时必须设为 `serverchan`。 |
 | `VISA_SERVERCHAN_KEY` | 是 | `你的 SendKey` | SendKey，可在 [Server酱](https://sct.ftqq.com/) 获取。 |
+
+切换到 Server酱时，注释 `.env` 中默认的 PushDeer 配置组，再取消 Server酱配置组的注释。
 
 ## 其他环境变量
 
