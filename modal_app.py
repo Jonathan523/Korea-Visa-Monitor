@@ -6,12 +6,7 @@ import modal
 CONTAINER_IMAGE = "ghcr.io/jonathan523/korea-visa-monitor:latest"
 STATE_MOUNT = "/state"
 
-image = (
-    modal.Image.from_registry(CONTAINER_IMAGE)
-    # The project is copied to /app by the image's Dockerfile. Make its
-    # modules importable regardless of Modal's runtime working directory.
-    .env({"PYTHONPATH": "/app"})
-)
+image = modal.Image.from_registry(CONTAINER_IMAGE)
 
 # Values in the local .env file are encrypted and injected into the Function.
 config = modal.Secret.from_dotenv(__file__)
@@ -27,6 +22,9 @@ app = modal.App("krvisa-monitor")
     secrets=[config],
     volumes={STATE_MOUNT: state_volume},
     schedule=modal.Cron("*/10 8-19 * * *", timezone="Asia/Shanghai"),
+    cpu=0.05,
+    memory=64,
+    single_use_containers=True,
     timeout=120,
 )
 def check_visa():

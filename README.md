@@ -6,11 +6,13 @@
 
 首次使用时，先复制 `.env.example` 为 `.env` 并填写申请信息和推送密钥，然后执行一次 `uvx modal setup` 登录 Modal。之后部署或更新都只需一行：
 
-```powershell
-# pipx
-pipx run modal deploy modal_app.py
+```bash
 # uv
-uvx modal deploy modal_app.py
+uvx --with python-dotenv modal deploy modal_app.py
+# pipx
+pipx install modal
+pipx inject modal python-dotenv
+modal deploy modal_app.py
 ```
 
 部署后，任务会按 UTC+8 每天 `08:00`–`20:00` 每 10 分钟查询一次。`.env` 会作为 Modal Secret 加密注入，默认将查询状态保存在自动创建的 `krvisa-state` Volume 中；本机关闭后任务仍会继续运行。可用 `uvx modal run modal_app.py` 立即手动执行一次检查。
