@@ -2,22 +2,33 @@
 
 本项目用于按照给定的时间间隔自动查询并监控韩国签证申请状态。在首次运行或检测到状态变化时，程序会通过配置的推送渠道发送通知；查询时间窗口、申请人信息和推送方式均可通过环境变量配置。
 
-## 部署到 Modal
+## 快速部署到 Modal
 
-首次使用时，先复制 `.env.example` 为 `.env` 并填写申请信息和推送密钥，然后执行一次 `uvx modal setup` 登录 Modal。之后部署或更新都只需一行：
+推荐使用 [Google Cloud Shell](https://shell.cloud.google.com/) 完成部署，其已预装所需的基础依赖。如需手动安装 `uv`，请执行：
 
 ```bash
-# uv
-uvx --with python-dotenv modal deploy modal_app.py
-# pipx
-pipx install modal
-pipx inject modal python-dotenv
-modal deploy modal_app.py
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-部署后，任务会按 UTC+8 每天 `08:00`–`20:00` 每 10 分钟查询一次。`.env` 会作为 Modal Secret 加密注入，默认将查询状态保存在自动创建的 `krvisa-state` Volume 中；本机关闭后任务仍会继续运行。可用 `uvx modal run modal_app.py` 立即手动执行一次检查。
+### 首次部署
 
-`.env.example` 保留了全部存储和推送选项：Modal Volume 与 PushDeer 默认启用，S3、Upstash Redis 和 Server酱默认以注释形式保留。选择其他方案时，先注释当前默认配置，再取消目标方案的注释。
+克隆本仓库，将 `.env.example` 复制为 `.env`，然后填写申请信息及消息推送密钥。最后，登录并完成 Modal 的初始化配置：
+
+```bash
+git clone https://github.com/Jonathan523/Korea-Visa-Monitor.git
+cd Korea-Visa-Monitor
+cp .env.example .env
+nano .env
+uvx modal setup
+```
+
+### 部署或更新
+
+完成首次配置后，后续部署或更新只需执行：
+
+```bash
+uvx --with python-dotenv modal deploy modal_app.py
+```
 
 ## 状态存储配置
 
