@@ -19,7 +19,7 @@
 | `VISA_S3_BUCKET` | 是 | `my-bucket` | 保存状态的 bucket。 |
 | `VISA_S3_KEY` | 否 | `visa_state.json` | 状态对象的 key。 |
 | `VISA_S3_REGION` | 否 | `ap-northeast-2` | 有效的 AWS 区域代码；也可使用 `AWS_DEFAULT_REGION`。 |
-| `VISA_S3_ENDPOINT_URL` | 否 | 无 | 有效的 HTTP(S) URL，用于 MinIO、Cloudflare R2 等兼容 S3 服务。 |
+| `VISA_S3_ENDPOINT_URL` | 否 | 无 | S3 兼容服务端点；未填写协议时自动使用 `https://`。例如 `s3.us-west-004.backblazeb2.com`。 |
 | `AWS_ACCESS_KEY_ID` | 视情况 | 无 | 没有实例角色、任务角色或其他 AWS 凭据来源时必填。 |
 | `AWS_SECRET_ACCESS_KEY` | 视情况 | 无 | 与 `AWS_ACCESS_KEY_ID` 配套使用。 |
 | `AWS_SESSION_TOKEN` | 否 | 无 | 使用临时凭据时设置。 |

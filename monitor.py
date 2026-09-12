@@ -37,6 +37,14 @@ def _parse_window(name, default_str):
         return dtime(int(hour), int(minute))
 
 
+def _normalize_endpoint_url(value):
+    """为未指定协议的 S3 兼容端点默认补上 HTTPS。"""
+    value = value.strip()
+    if value and "://" not in value:
+        return f"https://{value}"
+    return value
+
+
 # 每天查询窗口（UTC+8），不含结束时间
 WINDOW_START = _parse_window("VISA_WINDOW_START", "08:00")
 WINDOW_END = _parse_window("VISA_WINDOW_END", "20:00")
@@ -68,7 +76,9 @@ STATE_FILE = os.environ.get(
 S3_BUCKET = os.environ.get("VISA_S3_BUCKET", "").strip()
 S3_KEY = os.environ.get("VISA_S3_KEY", "visa_state.json").strip()
 S3_REGION = os.environ.get("VISA_S3_REGION", "").strip()
-S3_ENDPOINT_URL = os.environ.get("VISA_S3_ENDPOINT_URL", "").strip()
+S3_ENDPOINT_URL = _normalize_endpoint_url(
+    os.environ.get("VISA_S3_ENDPOINT_URL", "")
+)
 
 # Upstash Redis REST 配置。使用 HTTP 接口可避免额外安装 Redis 客户端。
 UPSTASH_REDIS_REST_URL = os.environ.get(
