@@ -1,0 +1,58 @@
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Python bytecode, caches, and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.venv/
+venv/
+env/
+ENV/
+requirements.txt
+
+# Tests and local quality reports
+test_*.py
+tests/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+junit.xml
+
+# Build and packaging output
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Local configuration, secrets, and runtime data
+.env
+.env.*
+!.env.example
+*.local
+visa_state.json
+visa_state*.json.tmp
+*.log
+
+# Documentation and editor files
+README.md
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Docker Compose files are not needed by `docker build`
+compose*.yml
+compose*.yaml
+docker-compose*.yml
+docker-compose*.yaml
