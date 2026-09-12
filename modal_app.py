@@ -3,7 +3,7 @@
 import modal
 
 
-CONTAINER_IMAGE = "ghcr.io/jonathan523/korea-visa-monitor:latest"
+CONTAINER_IMAGE = "ghcr.io/jonathan523/korea-visa-monitor:go"
 STATE_MOUNT = "/state"
 
 image = modal.Image.from_registry(CONTAINER_IMAGE, force_build=True)

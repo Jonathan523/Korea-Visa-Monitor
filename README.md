@@ -62,7 +62,7 @@ uvx modal setup
 uvx --with python-dotenv modal deploy modal_app.py
 ```
 
-任务默认每 10 分钟在北京时间 08:00–20:00 运行，并自动挂载名为 `krvisa-state` 的持久化 Volume。Modal 使用本地存储时会把状态文件固定到 `/state/visa_state.json`；选择 S3 或 Upstash 时不使用该文件。
+任务默认使用 GHCR 的 `go` 镜像标签，每 10 分钟在北京时间 08:00–20:00 运行，并自动挂载名为 `krvisa-state` 的持久化 Volume。Modal 使用本地存储时会把状态文件固定到 `/state/visa_state.json`；选择 S3 或 Upstash 时不使用该文件。
 
 ## 配置
 
