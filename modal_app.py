@@ -1,4 +1,4 @@
-"""Modal deployment entrypoint for the visa status monitor."""
+"""Thin Modal deployment adapter for the Go visa monitor binary."""
 
 import modal
 
@@ -30,18 +30,18 @@ app = modal.App("krvisa-monitor")
 def check_visa():
     """Check once every ten minutes between 08:00 and 20:00 UTC+8."""
     import os
+    import subprocess
 
     # Modal Volume is the zero-configuration default. Explicit S3/Upstash
     # settings in .env still take precedence when users choose those backends.
     os.environ.setdefault("VISA_STATE_STORAGE", "local")
-    os.environ.setdefault("VISA_STATE_FILE", f"{STATE_MOUNT}/visa_state.json")
+    if os.environ["VISA_STATE_STORAGE"].strip().lower() == "local":
+        os.environ["VISA_STATE_FILE"] = f"{STATE_MOUNT}/visa_state.json"
 
-    import monitor
-
-    exit_code = monitor._run_main()
+    result = subprocess.run(["/app/krvisa"], check=False)
     state_volume.commit()
 
-    if exit_code:
+    if result.returncode:
         raise RuntimeError("Visa status check failed; see the logs above")
 
 

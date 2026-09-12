@@ -1,101 +1,124 @@
-# 韩国签证状态监控
+# 韩国签证状态监控（Go）
 
-本项目用于按照给定的时间间隔自动查询并监控韩国签证申请状态。在首次运行或检测到状态变化时，程序会通过配置的推送渠道发送通知；查询时间窗口、申请人信息和推送方式均可通过环境变量配置。
+本应用定时查询韩国签证门户，在首次运行或申请状态变化时发送通知；签证签发后会停止访问网页。业务逻辑已全部使用 Go 实现，单个静态二进制即可运行。
 
-## 快速部署到 Modal
+## 功能
 
-推荐使用 [Google Cloud Shell](https://shell.cloud.google.com/) 完成部署，其已预装所需的基础依赖。如需手动安装 `uv`，请执行：
+- 查询驻外使领馆护照申请，解析申请编号、入境目的和当前状态
+- UTC+8 查询时间窗，支持普通时间窗和跨午夜时间窗
+- PushDeer 或 Server酱通知
+- 本地文件、S3/S3 兼容服务或 Upstash Redis 状态存储
+- 原子本地写入、HTTP 超时、优雅停止和配置校验
+- 兼容旧版 Python 应用写入的状态 JSON
+
+## 本地运行
+
+需要 Go 1.24 或更高版本。复制配置模板并填写签证信息与通知密钥：
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+cp .env.example .env
 ```
 
-### 首次部署
-
-克隆本仓库，将 `.env.example` 复制为 `.env`，然后填写申请信息及消息推送密钥。最后，登录并完成 Modal 的初始化配置：
+程序读取系统环境变量，不会自动加载 `.env`。在 shell 或部署平台中导入变量后运行：
 
 ```bash
-git clone https://github.com/Jonathan523/Korea-Visa-Monitor.git
-cd Korea-Visa-Monitor
-cp .env.example .env
-nano .env
+go run ./cmd/krvisa
+```
+
+只查询并打印当前状态、不读取状态存储也不发送通知：
+
+```bash
+go run ./cmd/krvisa query
+```
+
+构建和测试：
+
+```bash
+go build -o bin/krvisa ./cmd/krvisa
+go test ./...
+go vet ./...
+```
+
+## Docker
+
+```bash
+docker build -t krvisa .
+docker run --rm --env-file .env -v krvisa-state:/state krvisa
+```
+
+若挂载 `/state`，请把 `VISA_STATE_FILE` 设为 `/state/visa_state.json`。镜像以非 root 用户运行；其中保留的 Python 运行时仅供 Modal 调用部署适配层，应用逻辑与默认入口均为 Go 二进制。
+
+## Modal 部署
+
+`modal_app.py` 只是 Modal 平台所需的部署适配层；查询、通知和存储仍由镜像内的 Go 二进制执行。首次使用先配置 Modal：
+
+```bash
 uvx modal setup
 ```
 
-### 部署或更新
-
-完成首次配置后，后续部署或更新只需执行：
+填写 `.env` 后部署：
 
 ```bash
 uvx --with python-dotenv modal deploy modal_app.py
 ```
 
-## 状态存储配置
+任务默认每 10 分钟在北京时间 08:00–20:00 运行，并自动挂载名为 `krvisa-state` 的持久化 Volume。Modal 使用本地存储时会把状态文件固定到 `/state/visa_state.json`；选择 S3 或 Upstash 时不使用该文件。
 
-### Modal Volume（默认）
+## 配置
 
-| 环境变量 | 是否必填 | 默认值 | 说明 |
-| --- | --- | --- | --- |
-| `VISA_STATE_STORAGE` | 否 | `local` | Modal Volume 通过本地文件接口读写，因此使用 `local`。 |
-| `VISA_STATE_FILE` | 否 | `/state/visa_state.json` | `/state` 挂载到自动创建的 `krvisa-state` Volume，容器重启后状态仍会保留。 |
+### 必填申请信息
 
-这是 Modal 部署的默认方案，不需要注册或配置其他存储服务。
+| 环境变量 | 格式 | 说明 |
+| --- | --- | --- |
+| `VISA_PASSPORT_NUMBER` | 字符串 | 护照号码 |
+| `VISA_ENGLISH_NAME` | 如 `ZHANG SAN` | 护照英文姓名，程序自动转为大写 |
+| `VISA_BIRTHDAY` | `YYYY-MM-DD` | 有效公历出生日期 |
 
-### S3
+### 查询与时间窗
 
-| 环境变量 | 是否必填 | 默认值/示例 | 说明 |
-| --- | --- | --- | --- |
-| `VISA_STATE_STORAGE` | 是 | `s3` | 状态存储方式。可选值：`local`、`s3`、`upstash`；使用 S3 时必须设为 `s3`。 |
-| `VISA_S3_BUCKET` | 是 | `my-bucket` | 保存状态的 bucket。 |
-| `VISA_S3_KEY` | 否 | `visa_state.json` | 状态对象的 key。 |
-| `VISA_S3_REGION` | 否 | `ap-northeast-2` | 有效的 AWS 区域代码；也可使用 `AWS_DEFAULT_REGION`。 |
-| `VISA_S3_ENDPOINT_URL` | 否 | 无 | S3 兼容服务端点；未填写协议时自动使用 `https://`。例如 `s3.us-west-004.backblazeb2.com`。 |
-| `AWS_ACCESS_KEY_ID` | 视情况 | 无 | 没有实例角色、任务角色或其他 AWS 凭据来源时必填。 |
-| `AWS_SECRET_ACCESS_KEY` | 视情况 | 无 | 与 `AWS_ACCESS_KEY_ID` 配套使用。 |
-| `AWS_SESSION_TOKEN` | 否 | 无 | 使用临时凭据时设置。 |
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `VISA_WINDOW_START` | `08:00` | 每日开始时间（UTC+8，包含） |
+| `VISA_WINDOW_END` | `20:00` | 每日结束时间（UTC+8，不包含）；与开始时间相同表示全天 |
+| `VISA_QUERY_URL` | 韩国签证门户地址 | 通常无需修改，可用于代理或集成测试 |
 
-使用 S3 时，注释 `.env` 中默认的 `VISA_STATE_STORAGE=local` 和 `VISA_STATE_FILE`，再取消 S3 配置组的注释。凭据由 AWS SDK 的标准凭据链读取；所用身份至少需要目标对象的 `s3:GetObject` 和 `s3:PutObject` 权限。
+### 通知
 
-### Upstash Redis（推荐用于无状态容器）
+默认使用 PushDeer：
 
-| 环境变量 | 是否必填 | 默认值/示例 | 说明 |
-| --- | --- | --- | --- |
-| `VISA_STATE_STORAGE` | 是 | `upstash` | 状态存储方式。可选值：`local`、`s3`、`upstash`；使用 Upstash Redis 时必须设为 `upstash`。 |
-| `UPSTASH_REDIS_REST_URL` | 是 | `https://your-database.upstash.io` | 有效的 HTTP(S) URL，即 Upstash 数据库的 REST API 地址。 |
-| `UPSTASH_REDIS_REST_TOKEN` | 是 | 无 | Upstash REST API Token，应保存到部署平台的 Secret 中。 |
-| `VISA_UPSTASH_KEY` | 否 | `krvisa:visa_state` | 状态记录的 key；多个监控任务应使用不同的 key。 |
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `VISA_PUSH_CHANNEL` | `pushdeer` | `pushdeer` 或 `serverchan` |
+| `VISA_PUSHDEER_KEY` | 无 | PushDeer PushKey |
+| `VISA_PUSHDEER_ENDPOINT` | `https://api2.pushdeer.com/message/push` | PushDeer API 地址 |
+| `VISA_SERVERCHAN_KEY` | 无 | Server酱 SendKey（选择 `serverchan` 时必填） |
 
-使用 Upstash 时，注释 `.env` 中默认的 Modal Volume 配置，再取消 Upstash 配置组的注释。此方式直接复用程序已有的 HTTP 客户端，不需要安装额外依赖。Token 不要写入镜像或提交到代码仓库。
+### 状态存储
 
-## 推送设置
+本地文件是默认方案：
 
-程序支持 `pushdeer` 和 `serverchan`（Server酱） 两种推送渠道，默认使用 PushDeer。只需配置所选渠道对应的密钥。
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `VISA_STATE_STORAGE` | `local` | `local`、`s3` 或 `upstash` |
+| `VISA_STATE_FILE` | 当前目录下 `visa_state.json` | 本地状态文件路径 |
 
-### PushDeer（默认）
+S3 使用官方 AWS SDK 的标准凭据链，支持环境变量、共享配置、工作负载角色和实例角色：
 
-| 环境变量 | 是否必填 | 默认值/示例 | 说明 |
-| --- | --- | --- | --- |
-| `VISA_PUSH_CHANNEL` | 否 | `pushdeer` | 推送渠道。可选值：`pushdeer`、`serverchan`；使用 PushDeer 时设为 `pushdeer`。 |
-| `VISA_PUSHDEER_KEY` | 是 | `你的 PushKey` | PushKey，可在 [PushDeer](https://www.pushdeer.com/) 获取。 |
-| `VISA_PUSHDEER_ENDPOINT` | 否 | `https://api2.pushdeer.com/message/push` | 有效的 HTTP(S) URL；使用自建服务时修改。 |
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `VISA_S3_BUCKET` | 无 | Bucket，选择 S3 时必填 |
+| `VISA_S3_KEY` | `visa_state.json` | 对象 key |
+| `VISA_S3_REGION` | `AWS_DEFAULT_REGION` 或 `ap-northeast-2` | AWS 区域 |
+| `VISA_S3_ENDPOINT_URL` | 无 | S3 兼容服务端点；省略协议时使用 HTTPS |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | 无 | 无角色凭据时设置 |
+| `AWS_SESSION_TOKEN` | 无 | 临时凭据可选项 |
 
-### Server酱
+Upstash Redis 使用 REST API：
 
-| 环境变量 | 是否必填 | 默认值/示例 | 说明 |
-| --- | --- | --- | --- |
-| `VISA_PUSH_CHANNEL` | 是 | `serverchan` | 推送渠道。可选值：`pushdeer`、`serverchan`；使用 Server酱时必须设为 `serverchan`。 |
-| `VISA_SERVERCHAN_KEY` | 是 | `你的 SendKey` | SendKey，可在 [Server酱](https://sct.ftqq.com/) 获取。 |
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `UPSTASH_REDIS_REST_URL` | 无 | REST API URL |
+| `UPSTASH_REDIS_REST_TOKEN` | 无 | REST API Token |
+| `VISA_UPSTASH_KEY` | `krvisa:visa_state` | 状态 key；多个监控任务应使用不同值 |
 
-切换到 Server酱时，注释 `.env` 中默认的 PushDeer 配置组，再取消 Server酱配置组的注释。
-
-## 其他环境变量
-
-| 环境变量 | 是否必填 | 默认值/格式 | 说明 |
-| --- | --- | --- | --- |
-| `VISA_PASSPORT_NUMBER` | 是 | 护照号码 | 用于查询签证状态的护照号码。 |
-| `VISA_ENGLISH_NAME` | 是 | 如 `ZHANG SAN` | 护照上的英文姓名，程序会自动转为大写。 |
-| `VISA_BIRTHDAY` | 是 | `YYYY-MM-DD` | 有效的公历出生日期，例如 `1990-01-31`。 |
-| `VISA_WINDOW_START` | 否 | `08:00` | `HH:MM` 格式，范围为 `00:00`–`23:59`；每日查询开始时间。 |
-| `VISA_WINDOW_END` | 否 | `20:00` | `HH:MM` 格式，范围为 `00:00`–`23:59`；每日查询结束时间，不含该时刻。 |
-
-查询时间窗口使用 UTC+8 时区，默认从 `08:00` 开始，到 `20:00` 结束（不含结束时间）。
+完整示例见 `.env.example`。不要提交 `.env` 或任何密钥。

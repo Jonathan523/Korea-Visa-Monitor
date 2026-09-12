@@ -1,4 +1,0 @@
-beautifulsoup4
-boto3
-requests
-serverchan-sdk

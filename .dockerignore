@@ -28,6 +28,8 @@ junit.xml
 # Build and packaging output
 build/
 dist/
+.cache/
+bin/
 *.egg-info/
 .eggs/
 
