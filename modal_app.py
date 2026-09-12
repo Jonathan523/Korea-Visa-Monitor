@@ -1,17 +1,16 @@
 """Modal deployment entrypoint for the visa status monitor."""
 
-from pathlib import Path
-
 import modal
 
 
-PROJECT_DIR = Path(__file__).resolve().parent
+CONTAINER_IMAGE = "ghcr.io/jonathan523/korea-visa-monitor:latest"
 STATE_MOUNT = "/state"
 
 image = (
-    modal.Image.debian_slim(python_version="3.13")
-    .pip_install_from_requirements(str(PROJECT_DIR / "requirements.txt"))
-    .add_local_python_source("check", "monitor")
+    modal.Image.from_registry(CONTAINER_IMAGE)
+    # The project is copied to /app by the image's Dockerfile. Make its
+    # modules importable regardless of Modal's runtime working directory.
+    .env({"PYTHONPATH": "/app"})
 )
 
 # Values in the local .env file are encrypted and injected into the Function.
