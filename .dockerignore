@@ -15,7 +15,6 @@ __pycache__/
 venv/
 env/
 ENV/
-requirements.txt
 
 # Tests and local quality reports
 test_*.py
