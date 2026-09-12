@@ -22,8 +22,8 @@ app = modal.App("krvisa-monitor")
     secrets=[config],
     volumes={STATE_MOUNT: state_volume},
     schedule=modal.Cron("*/10 8-19 * * *", timezone="Asia/Shanghai"),
-    cpu=0.05,
-    memory=64,
+    cpu=0.125,
+    memory=128,
     single_use_containers=True,
     timeout=120,
 )
