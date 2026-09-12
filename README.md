@@ -48,7 +48,7 @@ docker run --rm --env-file .env -v krvisa-state:/state krvisa
 
 ## Modal 部署
 
-`modal_app.py` 只是 Modal 平台所需的部署适配层；部署时会通过 Alpine 的 `apk` 在 Modal 派生层安装原生 musl Python。查询、通知和存储仍由 Go 二进制执行，GHCR 只需维护一个 `go` 镜像。首次使用先配置 Modal：
+`modal_app.py` 只是 Modal 平台所需的部署适配层；部署时会通过 Alpine 的 `apk` 在 Modal 派生层安装原生 musl Python，并清除容器默认入口以便 Modal 启动 Python Runner。查询、通知和存储仍由 Go 二进制执行，GHCR 只需维护一个 `go` 镜像。首次使用先配置 Modal：
 
 ```bash
 uvx modal setup

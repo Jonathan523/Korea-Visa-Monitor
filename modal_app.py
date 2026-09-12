@@ -12,7 +12,7 @@ image = modal.Image.from_registry(
         "RUN apk add --no-cache python3",
     ],
     force_build=True,
-)
+).entrypoint([])
 
 # Values in the local .env file are encrypted and injected into the Function.
 config = modal.Secret.from_dotenv(__file__)
