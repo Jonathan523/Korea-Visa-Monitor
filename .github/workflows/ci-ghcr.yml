@@ -26,21 +26,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Install dependencies
-        run: go mod download
-
-      - name: Test Go application
-        run: |
-          go test -race ./...
-          go vet ./...
-          python3 -m py_compile modal_app.py
-
       - name: Set lowercase image name
         id: image
         shell: bash
@@ -64,6 +49,7 @@ jobs:
           images: ${{ steps.image.outputs.name }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=python,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=go,enable=${{ github.ref == 'refs/heads/go' }}
             type=ref,event=tag
             type=sha

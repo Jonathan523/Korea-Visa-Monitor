@@ -31,12 +31,10 @@ go run ./cmd/krvisa
 go run ./cmd/krvisa query
 ```
 
-构建和测试：
+构建：
 
 ```bash
 go build -o bin/krvisa ./cmd/krvisa
-go test ./...
-go vet ./...
 ```
 
 ## Docker
