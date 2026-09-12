@@ -44,11 +44,11 @@ docker build -t krvisa .
 docker run --rm --env-file .env -v krvisa-state:/state krvisa
 ```
 
-若挂载 `/state`，请把 `VISA_STATE_FILE` 设为 `/state/visa_state.json`。运行镜像基于精简的 Debian，并以非 root 用户运行；其中只有 Go 二进制及 HTTPS 所需的 CA 证书。选择 glibc 基础镜像是为了让同一个镜像兼容 Modal 的 Python 运行时注入。
+若挂载 `/state`，请把 `VISA_STATE_FILE` 设为 `/state/visa_state.json`。运行镜像基于 Alpine，并以非 root 用户运行；其中只有 Go 二进制及 HTTPS 所需的 CA 证书。
 
 ## Modal 部署
 
-`modal_app.py` 只是 Modal 平台所需的部署适配层；Modal 会在该镜像上补入 Python 运行环境，查询、通知和存储仍由 Go 二进制执行。首次使用先配置 Modal：
+`modal_app.py` 只是 Modal 平台所需的部署适配层；部署时会通过 Alpine 的 `apk` 在 Modal 派生层安装原生 musl Python，随后恢复为非 root 用户。查询、通知和存储仍由 Go 二进制执行，GHCR 只需维护一个 `go` 镜像。首次使用先配置 Modal：
 
 ```bash
 uvx modal setup

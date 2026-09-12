@@ -8,7 +8,11 @@ STATE_MOUNT = "/state"
 
 image = modal.Image.from_registry(
     CONTAINER_IMAGE,
-    add_python="3.13",
+    setup_dockerfile_commands=[
+        "USER root",
+        "RUN apk add --no-cache python3",
+        "USER 10001:10001",
+    ],
     force_build=True,
 )
 
