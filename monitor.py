@@ -186,6 +186,26 @@ def state_string(result):
     )
 
 
+def is_issued_status(status):
+    """签证网站的签发状态通常形如“签发 (2026.08.15.)”。"""
+    return str(status or "").strip().startswith("签发")
+
+
+def stored_state_is_issued(state):
+    """兼容新旧状态文件，判断持久化状态是否已经签发。"""
+    if not state:
+        return False
+
+    if state.get("issued") is True:
+        return True
+
+    status_text = str(state.get("status_text") or "")
+    if status_text.startswith("found|"):
+        return is_issued_status(status_text.rsplit("|", 1)[-1])
+
+    return False
+
+
 def _s3_client():
     """按环境变量创建 S3 客户端；仅在选择 S3 存储时加载 boto3。"""
     try:
@@ -342,11 +362,12 @@ def load_state():
     return load_local_state()
 
 
-def save_state(status_text, summary, now):
+def save_state(status_text, summary, now, issued=False):
     """将当前状态写入所选存储后端。"""
     state = {
         "status_text": status_text,
         "summary": summary,
+        "issued": issued,
         "updated_at": now.isoformat(),
     }
 
@@ -384,6 +405,17 @@ def main():
         sys.exit(0)
 
     try:
+        prev = load_state()
+    except RuntimeError as exc:
+        # 存储不可用时停止本轮，避免查询后无法判断是否已进入终态。
+        print(f"读取历史状态失败：{exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if stored_state_is_issued(prev):
+        print(f"{now:%H:%M} 持久化状态已签发，跳过网页检查")
+        return
+
+    try:
         result = query_visa_status(
             PASSPORT_NUMBER,
             ENGLISH_NAME,
@@ -395,30 +427,26 @@ def main():
         sys.exit(1)
 
     current = state_string(result)
-    try:
-        prev = load_state()
-    except RuntimeError as exc:
-        # 存储不可用时停止本轮，避免把读取故障误判成首次运行。
-        print(f"读取历史状态失败：{exc}", file=sys.stderr)
-        sys.exit(1)
+    summary = format_result(result)
+    issued = result["found"] and is_issued_status(result.get("status"))
 
     if prev is None:
         # 无历史状态 → 首次运行，发一条通知并记录初始状态
         send_push(
-            "签证监控已启动（首次运行）",
-            format_result(result),
+            "恭喜！您的签证已被签发！" if issued else "签证监控已启动（首次运行）",
+            summary,
         )
-        save_state(current, format_result(result), now)
+        save_state(current, summary, now, issued=issued)
         print(f"{now:%H:%M} 首次运行，已发送通知并记录初始状态")
         return
 
     if current != prev.get("status_text"):
         old_summary = prev.get("summary") or prev.get("status_text")
         send_push(
-            "签证申请状态有变化",
-            f"【旧状态】\n{old_summary}\n\n【新状态】\n{format_result(result)}",
+            "恭喜！您的签证已被签发！" if issued else "签证申请状态有变化",
+            f"【旧状态】\n{old_summary}\n\n【新状态】\n{summary}",
         )
-        save_state(current, format_result(result), now)
+        save_state(current, summary, now, issued=issued)
         print(f"{now:%H:%M} 状态变化，已发送通知")
     else:
         print(f"{now:%H:%M} 状态无变化，不通知")
