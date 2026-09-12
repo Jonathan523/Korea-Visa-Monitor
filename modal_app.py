@@ -6,7 +6,11 @@ import modal
 CONTAINER_IMAGE = "ghcr.io/jonathan523/korea-visa-monitor:go"
 STATE_MOUNT = "/state"
 
-image = modal.Image.from_registry(CONTAINER_IMAGE, force_build=True)
+image = modal.Image.from_registry(
+    CONTAINER_IMAGE,
+    add_python="3.13",
+    force_build=True,
+)
 
 # Values in the local .env file are encrypted and injected into the Function.
 config = modal.Secret.from_dotenv(__file__)
