@@ -1,6 +1,9 @@
 import json
 import os
 import sys
+import time
+import uuid
+from contextlib import closing
 from datetime import datetime, time as dtime, timedelta, timezone
 
 import requests
@@ -57,7 +60,7 @@ def _normalize_endpoint_url(value):
 WINDOW_START = _parse_window("VISA_WINDOW_START", "08:00")
 WINDOW_END = _parse_window("VISA_WINDOW_END", "20:00")
 
-# 推送渠道：pushdeer 或 serverchan（默认 pushdeer）
+# 推送渠道：pushdeer、serverchan 或 newmsg（默认 pushdeer）
 PUSH_CHANNEL = os.environ.get("VISA_PUSH_CHANNEL", "pushdeer").strip().lower()
 
 # Server酱 SendKey，在 https://sct.ftqq.com 获取
@@ -69,6 +72,13 @@ PUSHDEER_ENDPOINT = os.environ.get(
     "VISA_PUSHDEER_ENDPOINT",
     "https://api2.pushdeer.com/message/push",
 )
+
+# 中国移动 5G 消息（cmcc-newmsg）
+NEWMSG_API_KEY = os.environ.get("VISA_NEWMSG_API_KEY", "").strip()
+NEWMSG_ENDPOINT = os.environ.get(
+    "VISA_NEWMSG_ENDPOINT",
+    "wss://5gvas01.cmicmaap.com/gtw-ai/openclaw/ws/msg",
+).strip()
 
 # 状态存储方式：local、s3 或 upstash（默认 local，保持原有行为）
 STATE_STORAGE = os.environ.get("VISA_STATE_STORAGE", "local").strip().lower()
@@ -107,9 +117,11 @@ def send_push(text, desp):
         send_serverchan(text, desp)
     elif PUSH_CHANNEL == "pushdeer":
         send_pushdeer(text, desp)
+    elif PUSH_CHANNEL == "newmsg":
+        send_newmsg(text, desp)
     else:
         raise RuntimeError(
-            f"未知推送渠道：{PUSH_CHANNEL}（可选：pushdeer / serverchan）"
+            f"未知推送渠道：{PUSH_CHANNEL}（可选：pushdeer / serverchan / newmsg）"
         )
 
 
@@ -152,6 +164,47 @@ def send_pushdeer(text, desp):
 
     if payload.get("code") != 0:
         raise RuntimeError(f"PushDeer返回错误：{payload}")
+
+
+def send_newmsg(text, desp):
+    """按 cmcc-newmsg 插件的 WebSocket 协议发送文本通知。"""
+    if not NEWMSG_API_KEY.startswith(("ak_", "app_")):
+        raise RuntimeError("未配置有效的 VISA_NEWMSG_API_KEY（须以 ak_ 或 app_ 开头）")
+    if not NEWMSG_ENDPOINT.startswith(("wss://", "ws://")):
+        raise RuntimeError("VISA_NEWMSG_ENDPOINT 必须是 WebSocket URL")
+
+    from websocket import WebSocketException, create_connection
+
+    try:
+        with closing(create_connection(
+            NEWMSG_ENDPOINT,
+            timeout=10,
+            header={"X-API-Key": NEWMSG_API_KEY},
+        )) as ws:
+            ws.send(json.dumps({
+                "type": "auth", "apiKey": NEWMSG_API_KEY, "version": "2.0"
+            }))
+            deadline = time.monotonic() + 10
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise RuntimeError("newmsg 认证超时")
+                ws.settimeout(remaining)
+                response = json.loads(ws.recv())
+                if response.get("type") == "auth_ok":
+                    break
+                if response.get("type") in ("auth_failed", "error"):
+                    raise RuntimeError("newmsg 认证失败或服务端返回错误")
+
+            ws.send(json.dumps({
+                "type": "send",
+                "apiKey": NEWMSG_API_KEY,
+                "to": NEWMSG_API_KEY,
+                "content": f"{text}\n{desp}" if desp else text,
+                "messageId": f"msg_{int(time.time() * 1000)}_{uuid.uuid4().hex[:9]}",
+            }, ensure_ascii=False))
+    except (OSError, ValueError, WebSocketException) as exc:
+        raise RuntimeError(f"newmsg 发送失败：{exc}") from exc
 
 
 def format_result(result):

@@ -30,6 +30,8 @@ uvx modal setup
 uvx --with python-dotenv modal deploy modal_app.py
 ```
 
+`.env.example` 保留了全部存储和推送选项：Modal Volume 与 PushDeer 默认启用，S3、Upstash Redis、Server酱和 newmsg 默认以注释形式保留。选择其他方案时，先注释当前默认配置，再取消目标方案的注释。
+
 ## 状态存储配置
 
 ### Modal Volume（默认）
@@ -69,13 +71,13 @@ uvx --with python-dotenv modal deploy modal_app.py
 
 ## 推送设置
 
-程序支持 `pushdeer` 和 `serverchan`（Server酱） 两种推送渠道，默认使用 PushDeer。只需配置所选渠道对应的密钥。
+程序支持 `pushdeer`、`serverchan`（Server酱）和 `newmsg` 三种推送渠道，默认使用 PushDeer。只需配置所选渠道对应的密钥。
 
 ### PushDeer（默认）
 
 | 环境变量 | 是否必填 | 默认值/示例 | 说明 |
 | --- | --- | --- | --- |
-| `VISA_PUSH_CHANNEL` | 否 | `pushdeer` | 推送渠道。可选值：`pushdeer`、`serverchan`；使用 PushDeer 时设为 `pushdeer`。 |
+| `VISA_PUSH_CHANNEL` | 否 | `pushdeer` | 推送渠道。可选值：`pushdeer`、`serverchan`、`newmsg`；使用 PushDeer 时设为 `pushdeer`。 |
 | `VISA_PUSHDEER_KEY` | 是 | `你的 PushKey` | PushKey，可在 [PushDeer](https://www.pushdeer.com/) 获取。 |
 | `VISA_PUSHDEER_ENDPOINT` | 否 | `https://api2.pushdeer.com/message/push` | 有效的 HTTP(S) URL；使用自建服务时修改。 |
 
@@ -83,10 +85,27 @@ uvx --with python-dotenv modal deploy modal_app.py
 
 | 环境变量 | 是否必填 | 默认值/示例 | 说明 |
 | --- | --- | --- | --- |
-| `VISA_PUSH_CHANNEL` | 是 | `serverchan` | 推送渠道。可选值：`pushdeer`、`serverchan`；使用 Server酱时必须设为 `serverchan`。 |
+| `VISA_PUSH_CHANNEL` | 是 | `serverchan` | 推送渠道。可选值：`pushdeer`、`serverchan`、`newmsg`；使用 Server酱时必须设为 `serverchan`。 |
 | `VISA_SERVERCHAN_KEY` | 是 | `你的 SendKey` | SendKey，可在 [Server酱](https://sct.ftqq.com/) 获取。 |
 
 切换到 Server酱时，注释 `.env` 中默认的 PushDeer 配置组，再取消 Server酱配置组的注释。
+
+### newmsg（中国移动 5G 消息）
+
+| 环境变量 | 是否必填 | 默认值/示例 | 说明 |
+| --- | --- | --- | --- |
+| `VISA_PUSH_CHANNEL` | 是 | `newmsg` | 启用 newmsg。 |
+| `VISA_NEWMSG_API_KEY` | 是 | `ak_...` 或 `app_...` | 从 newmsg 获取的 API Key。 |
+| `VISA_NEWMSG_ENDPOINT` | 否 | `wss://5gvas01.cmicmaap.com/gtw-ai/openclaw/ws/msg` | 插件包中配置的 WebSocket 地址。 |
+
+使用时注释 `.env` 中的 PushDeer 配置组，再取消 newmsg 配置组的注释。程序会将 API Key 同时用作接收目标，此方式已实测收到推送：
+
+```dotenv
+VISA_PUSH_CHANNEL=newmsg
+VISA_NEWMSG_API_KEY=ak_你的密钥
+```
+
+不要将真实密钥提交到仓库。程序直接使用插件包所用的 WebSocket 协议，不需要在 Modal 容器中安装 OpenClaw 插件。连接认证成功后发送一条文本消息；发送调用成功表示消息已写入 WebSocket，最终送达需以服务端或手机端结果为准。更新 `requirements.txt` 后，部署 Modal 前需重新构建所引用的容器镜像。
 
 ## 其他环境变量
 
