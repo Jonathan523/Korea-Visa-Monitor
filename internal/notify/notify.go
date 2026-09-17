@@ -22,6 +22,9 @@ func New(cfg config.Config) Sender {
 	if cfg.PushChannel == "serverchan" {
 		return &serverChan{key: cfg.ServerChanKey, client: client}
 	}
+	if cfg.PushChannel == "newmsg" {
+		return &newmsg{key: cfg.NewmsgAPIKey, endpoint: cfg.NewmsgEndpoint}
+	}
 	return &pushDeer{key: cfg.PushDeerKey, endpoint: cfg.PushDeerEndpoint, client: client}
 }
 

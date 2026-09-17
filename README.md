@@ -6,7 +6,7 @@
 
 - 查询驻外使领馆护照申请，解析申请编号、入境目的和当前状态
 - UTC+8 查询时间窗，支持普通时间窗和跨午夜时间窗
-- PushDeer 或 Server酱通知
+- PushDeer、Server酱或 newmsg 通知
 - 本地文件、S3/S3 兼容服务或 Upstash Redis 状态存储
 - 原子本地写入、HTTP 超时、优雅停止和配置校验
 - 兼容旧版 Python 应用写入的状态 JSON
@@ -86,10 +86,21 @@ uvx --with python-dotenv modal deploy modal_app.py
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `VISA_PUSH_CHANNEL` | `pushdeer` | `pushdeer` 或 `serverchan` |
+| `VISA_PUSH_CHANNEL` | `pushdeer` | `pushdeer`、`serverchan` 或 `newmsg` |
 | `VISA_PUSHDEER_KEY` | 无 | PushDeer PushKey |
 | `VISA_PUSHDEER_ENDPOINT` | `https://api2.pushdeer.com/message/push` | PushDeer API 地址 |
 | `VISA_SERVERCHAN_KEY` | 无 | Server酱 SendKey（选择 `serverchan` 时必填） |
+| `VISA_NEWMSG_API_KEY` | 无 | newmsg API Key（选择 `newmsg` 时必填，以 `ak_` 或 `app_` 开头） |
+| `VISA_NEWMSG_ENDPOINT` | `wss://5gvas01.cmicmaap.com/gtw-ai/openclaw/ws/msg` | newmsg WebSocket 地址 |
+
+使用 newmsg 时，在 `.env` 中注释默认的 PushDeer 配置组，并填写：
+
+```dotenv
+VISA_PUSH_CHANNEL=newmsg
+VISA_NEWMSG_API_KEY=ak_你的密钥
+```
+
+API Key 同时作为接收目标，无需另设目标变量。Python 版使用此配置已实测收到推送；Go 版已通过连接、认证和发送测试，最终送达以手机端为准。真实密钥只放在本地 `.env` 或部署平台的 Secret 中。
 
 ### 状态存储
 

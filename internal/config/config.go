@@ -11,6 +11,7 @@ import (
 
 const (
 	defaultPushDeerEndpoint = "https://api2.pushdeer.com/message/push"
+	defaultNewmsgEndpoint   = "wss://5gvas01.cmicmaap.com/gtw-ai/openclaw/ws/msg"
 	defaultVisaURL          = "https://www.visa.go.kr/openPage.do?MENU_ID=10301"
 )
 
@@ -28,6 +29,8 @@ type Config struct {
 	PushDeerKey      string
 	PushDeerEndpoint string
 	ServerChanKey    string
+	NewmsgAPIKey     string
+	NewmsgEndpoint   string
 
 	StateStorage string
 	StateFile    string
@@ -64,6 +67,8 @@ func Load() (Config, []string, error) {
 		PushDeerKey:      strings.TrimSpace(os.Getenv("VISA_PUSHDEER_KEY")),
 		PushDeerEndpoint: envDefault("VISA_PUSHDEER_ENDPOINT", defaultPushDeerEndpoint),
 		ServerChanKey:    strings.TrimSpace(os.Getenv("VISA_SERVERCHAN_KEY")),
+		NewmsgAPIKey:     strings.TrimSpace(os.Getenv("VISA_NEWMSG_API_KEY")),
+		NewmsgEndpoint:   envDefault("VISA_NEWMSG_ENDPOINT", defaultNewmsgEndpoint),
 		StateStorage:     strings.ToLower(envDefault("VISA_STATE_STORAGE", "local")),
 		StateFile:        envDefault("VISA_STATE_FILE", filepath.Join(cwd, "visa_state.json")),
 		S3Bucket:         strings.TrimSpace(os.Getenv("VISA_S3_BUCKET")),
@@ -93,8 +98,15 @@ func (c Config) Validate() error {
 		if c.ServerChanKey == "" {
 			return fmt.Errorf("使用 Server酱时必须配置 VISA_SERVERCHAN_KEY")
 		}
+	case "newmsg":
+		if !strings.HasPrefix(c.NewmsgAPIKey, "ak_") && !strings.HasPrefix(c.NewmsgAPIKey, "app_") {
+			return fmt.Errorf("VISA_NEWMSG_API_KEY 必须以 ak_ 或 app_ 开头")
+		}
+		if err := validWebSocketURL("VISA_NEWMSG_ENDPOINT", c.NewmsgEndpoint); err != nil {
+			return err
+		}
 	default:
-		return fmt.Errorf("未知推送渠道 %q（可选：pushdeer / serverchan）", c.PushChannel)
+		return fmt.Errorf("未知推送渠道 %q（可选：pushdeer / serverchan / newmsg）", c.PushChannel)
 	}
 	switch c.StateStorage {
 	case "local":
@@ -185,6 +197,14 @@ func validHTTPURL(name, value string) error {
 	u, err := url.Parse(value)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return fmt.Errorf("%s 必须是有效的 HTTP(S) URL", name)
+	}
+	return nil
+}
+
+func validWebSocketURL(name, value string) error {
+	u, err := url.Parse(value)
+	if err != nil || (u.Scheme != "ws" && u.Scheme != "wss") || u.Host == "" {
+		return fmt.Errorf("%s 必须是有效的 WebSocket URL", name)
 	}
 	return nil
 }
